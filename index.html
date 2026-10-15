@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One SSE connection · Node.js demo</title>
+<style>
+  * { box-sizing: border-box; } body { margin: 0; background: #f4f6fb; color: #17243b; font: 16px/1.6 system-ui, sans-serif; }
+  main { max-width: 800px; margin: 48px auto; padding: 28px; background: white; border-radius: 20px; box-shadow: 0 12px 40px #17243b0c; }
+  h1 { line-height: 1.2; margin-top: 8px; } .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .15em; color: #4263dc; }
+  button { background: #3457d5; color: white; border: 0; border-radius: 10px; padding: 14px 20px; font: inherit; cursor: pointer; } button:disabled { opacity: .5; cursor: wait; }
+  .connection { background: #eef8f3; padding: 16px; border-radius: 10px; margin: 20px 0; overflow-wrap: anywhere; }
+  code { font-size: 13px; } #log { background: #101e34; color: #d9e8ff; min-height: 180px; padding: 18px; border-radius: 12px; font: 13px/1.8 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .hint { color: #52627a; font-size: 14px; } #pending { min-height: 26px; } @media (max-width: 600px) { main { margin: 12px; padding: 20px; } }
+</style>
+<main>
+  <div class="eyebrow">NODE.JS + EVENTSOURCE</div>
+  <h1>One connection.<br>Many server messages.</h1>
+  <p>Hi Maayan! Click the button. The Node.js server waits <strong>2 seconds</strong>, then pushes a message over the same open SSE connection.</p>
+  <div class="connection" role="status"><strong id="status">Connecting…</strong><br>Connection ID: <code id="connection">—</code><br>Stream opens: <strong id="opens">0</strong> · Messages received: <strong id="count">0</strong></div>
+  <button id="send" disabled>Send a message in 2 seconds</button>
+  <div id="pending" class="hint" role="status"></div>
+  <pre id="log" aria-live="polite"></pre>
+  <p class="hint">Try several clicks. Each message comes through the same connection ID. Open DevTools → Network and filter by <code>events</code>: one request stays open.</p>
+  <p class="hint"><code>EventSource('/events')</code> opens the server → browser stream once. Each click uses a short <code>POST /send</code> to schedule work. The server uses <code>setTimeout(..., 2000)</code> and writes into the existing stream. SSE is a one-way HTTP stream; the POST is a separate request.</p>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const log = text => { $('log').textContent += new Date().toLocaleTimeString() + '  ' + text + '\n'; };
+  let connectionId, opens = 0, count = 0;
+  const pending = new Set();
+  const updatePending = () => $('pending').textContent = pending.size ? pending.size + ' message(s) waiting for the server…' : '';
+  // Exactly one EventSource is created, outside the click handler.
+  const events = new EventSource('/events');
+  events.addEventListener('connected', event => {
+    const previousId = connectionId;
+    connectionId = JSON.parse(event.data).connectionId;
+    if (previousId && previousId !== connectionId) { pending.clear(); updatePending(); log('Reconnected: previous pending messages were cancelled.'); }
+    $('connection').textContent = connectionId;
+    $('opens').textContent = ++opens;
+    $('status').textContent = '● SSE connected';
+    $('send').disabled = false;
+    log('Stream opened: ' + connectionId);
+  });
+  events.addEventListener('message', event => {
+    const message = JSON.parse(event.data);
+    pending.delete(message.number); updatePending();
+    $('count').textContent = ++count;
+    log(message.text + '\n  server delay: ' + (message.sentAt - message.requestedAt) + ' ms · connection: ' + message.connectionId);
+  });
+  events.onerror = () => { $('status').textContent = 'Reconnecting…'; $('send').disabled = true; };
+  $('send').onclick = async () => {
+    const id = connectionId;
+    try {
+      const response = await fetch('/send?connectionId=' + encodeURIComponent(id), { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      if (id !== connectionId) return;
+      pending.add(result.number); updatePending();
+      log('Queued #' + result.number + ' · server will push in 2 seconds');
+    } catch (error) { log('Request failed: ' + error.message); }
+  };
+  window.addEventListener('pagehide', () => events.close());
+</script>
+</html>

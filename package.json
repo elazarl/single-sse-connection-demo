@@ -1,0 +1,7 @@
+{
+  "name": "single-sse-connection-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "start": "node server.js" },
+  "stackblitz": { "startCommand": "npm start" }
+}
