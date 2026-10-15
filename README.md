@@ -4,6 +4,10 @@ Click **Send a message in 2 seconds**. A POST schedules work on the Node server.
 
 Run `npm start`, then open http://localhost:3000. No dependencies are needed.
 
+[Open the interactive StackBlitz editor](https://stackblitz.com/github/elazarl/single-sse-connection-demo?file=server.js,index.html) to see both frontend and backend alongside the preview.
+
+![Frontend and Node backend flow over one SSE connection](flow.png)
+
 In StackBlitz, allow the project to start and use the preview pane. Desktop Chrome or Edge is recommended for WebContainers. The Node server runs in a browser WebContainer, so no local setup is required.
 
 - `server.js`: persistent `GET /events`, heartbeat, delayed `POST /send`, cleanup on disconnect.

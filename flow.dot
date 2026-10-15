@@ -1,0 +1,45 @@
+digraph SSE {
+  graph [rankdir=TB, bgcolor="#F4F6FB", pad="0.45", nodesep="0.6", ranksep="0.65", fontname="Arial", label="ONE SSE CONNECTION  ·  DELAYED NODE.JS MESSAGE\nRead from top to bottom", labelloc=t, fontsize=23, fontcolor="#17243B", dpi=170];
+  node [group="browser", shape=box, style="rounded,filled", fontname="Arial", fontsize=15, margin="0.22,0.16", color="#D9E1EF", fillcolor="white", fontcolor="#17243B"];
+  edge [fontname="Arial", fontsize=13, color="#52627A", fontcolor="#34415A", penwidth=2, arrowsize=0.8];
+  browser [label="BROWSER / FRONTEND\nindex.html", fillcolor="#DFE7FF", color="#3457D5"];
+  server [group="server", label="NODE.JS / BACKEND\nserver.js", fillcolor="#DDF3E7", color="#23825B"];
+  {rank=same;browser;server;}
+  b1 [label="1. Page loads\nnew EventSource('/events')"];
+  s1 [group="server", label="GET /events\nContent-Type: text/event-stream\nKeep the response OPEN"];
+  {rank=same;b1;s1;}
+  b1 -> s1 [style=invis, weight=100];
+  browser -> b1 [arrowhead=none,color="#C2CDDF",weight=100];
+  server -> s1 [arrowhead=none,color="#C2CDDF",weight=100];
+  b1 -> s1 [constraint=false, label="Open ONE SSE stream",color="#3457D5"];
+  b2 [label="2. Receive 'connected' event\nStore connectionId; enable button"];
+  s2 [group="server", label="send('connected', { connectionId })"];
+  {rank=same;b2;s2;}
+  b2 -> s2 [style=invis, weight=100];
+  b1 -> b2 [style=invis,weight=100];
+  s1 -> s2 [arrowhead=none,color="#C2CDDF",weight=100];
+  s2 -> b2 [constraint=false, label="SSE: connection ID",color="#23825B",fontcolor="#23825B"];
+  b3 [label="3. Click the button\nfetch('/send?connectionId=...',\n{ method: 'POST' })"];
+  s3 [group="server", label="POST /send\nFind the existing SSE client\nSchedule setTimeout(..., 2000)"];
+  {rank=same;b3;s3;}
+  b3 -> s3 [style=invis, weight=100];
+  b2 -> b3 [arrowhead=none,color="#C2CDDF",weight=100];
+  s2 -> s3 [style=invis,weight=100];
+  b3 -> s3 [constraint=false, label="Separate short HTTP request",color="#3457D5"];
+  b4 [label="4. Show 'Queued'\nWait for a server event"];
+  s4 [group="server", label="Reply immediately: 202 Accepted\nTimer keeps running on the server"];
+  {rank=same;b4;s4;}
+  b4 -> s4 [style=invis, weight=100];
+  b3 -> b4 [style=invis,weight=100];
+  s3 -> s4 [arrowhead=none,color="#C2CDDF",weight=100];
+  s4 -> b4 [constraint=false, label="POST response: queued",color="#3457D5"];
+  b5 [label="5. 'message' event handler\nParse JSON; update the log\nSame connectionId",fillcolor="#DDF3E7"];
+  s5 [group="server", label="After 2 seconds\nclient.send('message', payload)\nres.write('event: message\\ndata: ...\\n\\n')",fillcolor="#DDF3E7"];
+  {rank=same;b5;s5;}
+  b5 -> s5 [style=invis, weight=100];
+  b4 -> b5 [style=invis,weight=100];
+  s4 -> s5 [label="2000 ms",color="#23825B"];
+  s5 -> b5 [constraint=false, label="Push over the SAME open SSE stream",color="#23825B",fontcolor="#23825B",penwidth=3];
+  note [label="CLICK AGAIN: repeat steps 3–5. No new EventSource.\nSSE is server → browser only; the button uses a separate POST.\nNode runs inside StackBlitz's browser WebContainer.",fillcolor="#FFF4D6",color="#E7C76A",fontsize=14];
+  b5 -> note [style=invis,weight=100]; s5 -> note [style=invis,weight=100];
+}
